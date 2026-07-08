@@ -1,40 +1,410 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Geolocation</title>
+    <title>Weather Station</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --bg: #1A1B3A;
+            --panel: #242760;
+            --panel-line: #3E4290;
+            --brass: #FF6FA0;
+            --brass-dim: #B84C79;
+            --parchment: #EFEBFA;
+            --muted: #9095D6;
+            --needle: #6FA8FF;
+            --warn: #FF6F91;
+        }
+        *{ box-sizing:border-box; }
+        body{
+            margin:0;
+            min-height:100vh;
+            background:
+                radial-gradient(circle at 20% -10%, #3A2E63 0%, transparent 55%),
+                radial-gradient(circle at 100% 110%, #2A1E4E 0%, transparent 50%),
+                var(--bg);
+            color:var(--parchment);
+            font-family:'IBM Plex Mono', monospace;
+            padding:40px 20px 60px;
+        }
+
+        .masthead{
+            max-width:920px;
+            margin:0 auto 28px;
+            display:flex;
+            justify-content:space-between;
+            align-items:flex-end;
+            border-bottom:1px solid var(--panel-line);
+            padding-bottom:18px;
+            gap:20px;
+            flex-wrap:wrap;
+        }
+        .masthead h1{
+            font-family:'Fraunces', serif;
+            font-weight:700;
+            font-size:2.1rem;
+            margin:0 0 6px;
+            letter-spacing:0.5px;
+        }
+        .masthead .sub{
+            color:var(--muted);
+            font-size:0.78rem;
+            letter-spacing:2px;
+            text-transform:uppercase;
+        }
+        .id-block{
+            text-align:right;
+            font-size:0.85rem;
+            line-height:1.6;
+            color:var(--muted);
+        }
+        .id-block b{ color:var(--parchment); font-weight:600; }
+        .id-block .label{
+            color:var(--brass);
+            font-size:0.68rem;
+            letter-spacing:1.5px;
+            text-transform:uppercase;
+        }
+
+        .console{
+            max-width:920px;
+            margin:0 auto;
+        }
+
+        .search-row{
+            display:flex;
+            gap:10px;
+            margin-bottom:28px;
+            flex-wrap:wrap;
+        }
+        .search-row input{
+            flex:1;
+            min-width:200px;
+            background:var(--panel);
+            border:1px solid var(--panel-line);
+            color:var(--parchment);
+            font-family:'IBM Plex Mono', monospace;
+            font-size:0.95rem;
+            padding:14px 16px;
+            border-radius:2px;
+            outline:none;
+            transition:border-color 0.2s;
+        }
+        .search-row input::placeholder{ color:#6F72B8; }
+        .search-row input:focus{ border-color:var(--brass); }
+        .search-row button{
+            background:var(--brass);
+            color:#1A1B3A;
+            border:none;
+            font-family:'IBM Plex Mono', monospace;
+            font-weight:600;
+            letter-spacing:1px;
+            text-transform:uppercase;
+            font-size:0.82rem;
+            padding:14px 26px;
+            border-radius:2px;
+            cursor:pointer;
+            transition:background 0.2s, transform 0.1s;
+        }
+        .search-row button:hover{ background:#FF8FBB; }
+        .search-row button:active{ transform:scale(0.97); }
+
+        .status-line{
+            font-size:0.78rem;
+            color:var(--muted);
+            margin:-18px 0 22px;
+            min-height:16px;
+            letter-spacing:0.5px;
+        }
+        .status-line.error{ color:var(--warn); }
+
+        .panel-grid{
+            display:grid;
+            grid-template-columns:280px 1fr;
+            gap:20px;
+        }
+        @media (max-width:700px){
+            .panel-grid{ grid-template-columns:1fr; }
+        }
+
+        /* --- Dial (signature element) --- */
+        .dial-panel{
+            background:var(--panel);
+            border:1px solid var(--panel-line);
+            border-radius:4px;
+            padding:26px;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            position:relative;
+        }
+        .dial-eyebrow{
+            position:absolute;
+            top:16px; left:20px;
+            font-size:0.66rem;
+            letter-spacing:2px;
+            color:var(--brass-dim);
+            text-transform:uppercase;
+        }
+        svg#gauge{ width:200px; height:200px; }
+        .gauge-arc-bg{ fill:none; stroke:#33366E; stroke-width:10; }
+        .gauge-arc{ fill:none; stroke:var(--needle); stroke-width:10; stroke-linecap:round;
+            transition:stroke-dashoffset 1s ease; }
+        .gauge-needle{ transform-origin:100px 100px; transition:transform 1s ease; }
+        .gauge-center-text{ font-family:'Fraunces', serif; }
+        .temp-c{
+            font-size:2.6rem;
+            font-weight:700;
+            fill:var(--parchment);
+        }
+        .temp-f{
+            margin-top:10px;
+            font-size:0.85rem;
+            color:var(--muted);
+            letter-spacing:1px;
+        }
+        .temp-f b{ color:var(--brass); font-weight:600; }
+
+        .humidity-strip{
+            width:100%;
+            margin-top:22px;
+            border-top:1px solid var(--panel-line);
+            padding-top:16px;
+        }
+        .humidity-strip .h-label{
+            display:flex;
+            justify-content:space-between;
+            font-size:0.7rem;
+            letter-spacing:1.5px;
+            color:var(--muted);
+            text-transform:uppercase;
+            margin-bottom:8px;
+        }
+        .humidity-strip .h-label b{ color:var(--needle); font-family:'IBM Plex Mono', monospace; }
+        .h-track{
+            height:6px;
+            background:#33366E;
+            border-radius:3px;
+            overflow:hidden;
+        }
+        .h-fill{
+            height:100%;
+            background:linear-gradient(90deg, var(--brass-dim), var(--needle));
+            width:0%;
+            transition:width 1s ease;
+        }
+
+        /* --- Data readout --- */
+        .readout-panel{
+            background:var(--panel);
+            border:1px solid var(--panel-line);
+            border-radius:4px;
+            padding:26px;
+        }
+        .readout-title{
+            font-family:'Fraunces', serif;
+            font-size:1.3rem;
+            font-weight:600;
+            margin:0 0 4px;
+        }
+        .readout-title .placeholder{ color:#6F72B8; }
+        .readout-region{
+            color:var(--muted);
+            font-size:0.85rem;
+            margin-bottom:22px;
+        }
+
+        .field-list{
+            list-style:none;
+            margin:0; padding:0;
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:14px 20px;
+        }
+        .field-list li{
+            border-bottom:1px dashed var(--panel-line);
+            padding-bottom:10px;
+        }
+        .field-list .f-label{
+            display:block;
+            font-size:0.66rem;
+            letter-spacing:1.5px;
+            text-transform:uppercase;
+            color:var(--brass-dim);
+            margin-bottom:4px;
+        }
+        .field-list .f-value{
+            font-size:1rem;
+            color:var(--parchment);
+        }
+
+        footer{
+            max-width:920px;
+            margin:34px auto 0;
+            font-size:0.68rem;
+            color:#5A5DAA;
+            letter-spacing:0.5px;
+            text-align:center;
+        }
+    </style>
 </head>
 <body>
+
+    <div class="masthead">
+        <div>
+            <h1>Weather Station</h1>
+            <div class="sub">Live atmospheric readout &mdash; WeatherAPI</div>
+        </div>
+        <div class="id-block">
+            <div><span class="label">Nama</span> &nbsp;<b>Safira Dwi Khairunisa</b></div>
+            <div><span class="label">NIM</span> &nbsp;<b>20240140173</b></div>
+        </div>
+    </div>
+
+    <div class="console">
+        <div class="search-row">
+            <input type="text" id="lokasi-input" placeholder="Masukkan nama lokasi">
+            <button id="btn-cari">Cari</button>
+        </div>
+        <div class="status-line" id="status-line"></div>
+
+        <div class="panel-grid">
+            <!-- DIAL / GAUGE -->
+            <div class="dial-panel">
+                <span class="dial-eyebrow">Suhu</span>
+                <svg id="gauge" viewBox="0 0 200 200">
+                    <path class="gauge-arc-bg" d="M 30 150 A 70 70 0 1 1 170 150"/>
+                    <path class="gauge-arc" id="gauge-arc" d="M 30 150 A 70 70 0 1 1 170 150"
+                          stroke-dasharray="330" stroke-dashoffset="330"/>
+                    <text x="100" y="108" text-anchor="middle" class="gauge-center-text temp-c" id="temp-c-text">--°</text>
+                </svg>
+                <div class="temp-f">Fahrenheit: <b id="temp-f-text">--°F</b></div>
+
+                <div class="humidity-strip">
+                    <div class="h-label"><span>Kelembapan</span><b id="humidity-text">--%</b></div>
+                    <div class="h-track"><div class="h-fill" id="humidity-fill"></div></div>
+                </div>
+            </div>
+
+            <!-- DATA READOUT -->
+            <div class="readout-panel">
+                <h2 class="readout-title" id="loc-title"><span class="placeholder">Belum ada data</span></h2>
+                <div class="readout-region" id="loc-region">Cari lokasi untuk menampilkan data cuaca</div>
+
+                <ul class="field-list">
+                    <li>
+                        <span class="f-label">Lokasi</span>
+                        <span class="f-value" id="f-lokasi">-</span>
+                    </li>
+                    <li>
+                        <span class="f-label">Region</span>
+                        <span class="f-value" id="f-region">-</span>
+                    </li>
+                    <li>
+                        <span class="f-label">Country</span>
+                        <span class="f-value" id="f-country">-</span>
+                    </li>
+                    <li>
+                        <span class="f-label">Longitude</span>
+                        <span class="f-value" id="f-lon">-</span>
+                    </li>
+                    <li>
+                        <span class="f-label">Latitude</span>
+                        <span class="f-value" id="f-lat">-</span>
+                    </li>
+                    <li>
+                        <span class="f-label">Suhu (Celcius)</span>
+                        <span class="f-value" id="f-tempc">-</span>
+                    </li>
+                    <li>
+                        <span class="f-label">Suhu (Fahrenheit)</span>
+                        <span class="f-value" id="f-tempf">-</span>
+                    </li>
+                    <li>
+                        <span class="f-label">Humidity</span>
+                        <span class="f-value" id="f-humidity">-</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <footer>Data disediakan oleh WeatherAPI.com &mdash; ganti API_KEY pada script sebelum digunakan</footer>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <h3>Nama : Safira Dwi Khairunisa</h3>
-    <h3>NIM : 20240140173</h3>
-
-    kota : <p id="lokasi"></p>
-    <br>
-    negara : <p id="negara"></p>
-
     <script>
-        const kota = "Jakarta";
-        const urlapi = "https://api.maptiler.com/geocoding/"+kota+".json?key=q5uL9oIJZRI5kbwgzLN6";
+        // Daftar akun gratis di https://www.weatherapi.com untuk mendapatkan API key
+        const API_KEY = "MASUKKAN_API_KEY_ANDA_DISINI";
 
-        $.ajax({
-            url : urlapi,
-            method : "GET",
-            success : function(data){
-                console.log(data);
-                const l = document.getElementById("lokasi");
-                const n = document.getElementById("negara");
-                let lokasi = data.features[0].matching_text;
-                let negara = data.features[0].geometry.coordinates;
-                l.innerHTML = lokasi;
-                n.innerHTML = negara;
-            },
-            error : function(error){
-                console.log(error);
+        function cariCuaca(){
+            const kota = $("#lokasi-input").val().trim();
+            const status = $("#status-line");
+
+            if(kota === ""){
+                status.addClass("error").text("Silakan masukkan nama lokasi terlebih dahulu.");
+                return;
+            }
+            if(API_KEY === "MASUKKAN_API_KEY_ANDA_DISINI"){
+                status.addClass("error").text("API key belum diisi. Ganti variabel API_KEY pada script dengan key dari weatherapi.com");
+                return;
             }
 
-        })
+            status.removeClass("error").text("Mengambil data...");
+
+            const urlapi = "https://api.weatherapi.com/v1/current.json?key=" + API_KEY + "&q=" + encodeURIComponent(kota) + "&aqi=no";
+
+            $.ajax({
+                url: urlapi,
+                method: "GET",
+                success: function(data){
+                    console.log(data);
+                    status.removeClass("error").text("Data berhasil dimuat.");
+
+                    const loc = data.location;
+                    const cur = data.current;
+
+                    // Judul & region
+                    $("#loc-title").html(loc.name + ", " + loc.country);
+                    $("#loc-region").text(loc.region + " · diperbarui " + loc.localtime);
+
+                    // Field list
+                    $("#f-lokasi").text(loc.name);
+                    $("#f-region").text(loc.region);
+                    $("#f-country").text(loc.country);
+                    $("#f-lon").text(loc.lon);
+                    $("#f-lat").text(loc.lat);
+                    $("#f-tempc").text(cur.temp_c + " °C");
+                    $("#f-tempf").text(cur.temp_f + " °F");
+                    $("#f-humidity").text(cur.humidity + " %");
+
+                    // Gauge suhu (skala -10°C s/d 45°C dipetakan ke arc 330)
+                    const minT = -10, maxT = 45;
+                    let pct = (cur.temp_c - minT) / (maxT - minT);
+                    pct = Math.max(0, Math.min(1, pct));
+                    const offset = 330 - (pct * 330);
+                    $("#gauge-arc").css("stroke-dashoffset", offset);
+                    $("#temp-c-text").text(cur.temp_c + "°");
+                    $("#temp-f-text").text(cur.temp_f + "°F");
+
+                    // Humidity bar
+                    $("#humidity-text").text(cur.humidity + "%");
+                    $("#humidity-fill").css("width", cur.humidity + "%");
+                },
+                error: function(error){
+                    console.log(error);
+                    status.addClass("error").text("Lokasi tidak ditemukan atau terjadi kesalahan pada API.");
+                }
+            });
+        }
+
+        $("#btn-cari").on("click", cariCuaca);
+        $("#lokasi-input").on("keypress", function(e){
+            if(e.which === 13){ cariCuaca(); }
+        });
     </script>
 
 </body>
